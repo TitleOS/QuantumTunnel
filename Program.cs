@@ -9,9 +9,9 @@ namespace QuantumTunnel
         static void Main(string[] args)
         {
             Console.WriteLine("QuantumTunnel - C# FlashFS Reader");
-            if(args.Length == 0)
+            if(args.Length > 1)
             {
-                Console.WriteLine("Provide name of file on flash. Example: certkeys.bin OR -rawdump to obtain a raw image of the flash, named flash.bin.");
+                Console.WriteLine("Provide name of file on flash and size. Example: certkeys.bin OR -rawdump to obtain a raw image of the flash, named flash.bin.");
                 Environment.Exit(1);
             }
             if(args[0].ToLower() == "-rawdump")
@@ -29,6 +29,7 @@ namespace QuantumTunnel
                 }
             }
             string filename = args[0];
+            int filesize = int.Parse(args[1]);
             FlashFS.ReadFile(filename);
             Console.WriteLine($"File read to {Environment.CurrentDirectory}\\{filename}");
         }
