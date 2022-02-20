@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Win32.SafeHandles;
 
 namespace QuantumTunnel
 {
@@ -13,14 +14,15 @@ namespace QuantumTunnel
 
         public static bool DumpFlashImage(string DumpToPath)
         {
-            IntPtr FileHandle = IntPtr.Zero;
-            FileHandle = KernelBase.CreateFile(RawFlashDeviceName, System.IO.FileAccess.Read, System.IO.FileShare.None, IntPtr.Zero, System.IO.FileMode.Open, System.IO.FileAttributes.Normal, IntPtr.Zero);
-            if(FileHandle == IntPtr.Zero)
+            IntPtr pHandle = KernelBase.CreateFile(RawFlashDeviceName, System.IO.FileAccess.Read, System.IO.FileShare.None, IntPtr.Zero, System.IO.FileMode.Open, System.IO.FileAttributes.Normal, IntPtr.Zero);
+            if(pHandle == IntPtr.Zero)
             {
                 return false;
             }
-            ;
-            using (FileStream fsFlash = new FileStream(FileHandle, FileAccess.Read))
+            // Wrap the raw ptr into self-disposing handle
+            SafeFileHandle hFlash = new SafeFileHandle(pHandle, true);
+
+            using (FileStream fsFlash = new FileStream(hFlash, FileAccess.Read))
             using (FileStream fsOutputFile = new FileStream(DumpToPath, FileMode.Create, FileAccess.Write))
             {
                 int count = 0;
@@ -29,7 +31,6 @@ namespace QuantumTunnel
                 {
                     count = fsFlash.Read(buf, 0, buf.Length);
                     fsOutputFile.Write(buf, 0, count);
-                    total -=  count;
                 } while (fsFlash.CanRead && count > 0);
             }
             return true;
