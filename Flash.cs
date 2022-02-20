@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -19,22 +19,20 @@ namespace QuantumTunnel
             {
                 return false;
             }
-            FileStream FlashStream = new FileStream(FileHandle, FileAccess.Read);
-            byte[] b = null;
-            using (MemoryStream ms = new MemoryStream())
+            ;
+            using (FileStream fsFlash = new FileStream(FileHandle, FileAccess.Read))
+            using (FileStream fsOutputFile = new FileStream(DumpToPath, FileMode.Create, FileAccess.Write))
             {
                 int count = 0;
+                byte[] buf = new byte[1024 * 1024]; // 1MB
                 do
                 {
-                    byte[] buf = new byte[1024];
-                    count = FlashStream.Read(buf, 0, 1024);
-                    ms.Write(buf, 0, count);
-                } while (FlashStream.CanRead && count > 0);
-                b = ms.ToArray();
-                File.WriteAllBytes(DumpToPath, b);
+                    count = fsFlash.Read(buf, 0, buf.Length);
+                    fsOutputFile.Write(buf, 0, count);
+                    total -=  count;
+                } while (fsFlash.CanRead && count > 0);
             }
             return true;
-
         }
     }
 }
