@@ -17,25 +17,34 @@ namespace QuantumTunnel
         public static bool ReadFile(string name)
         {
             string fullpath = FlashDeviceName + "\\" + name;
-            IntPtr pHandle = KernelBase.CreateFile(fullpath, System.IO.FileAccess.Read, System.IO.FileShare.None, IntPtr.Zero, System.IO.FileMode.Open, System.IO.FileAttributes.Normal, IntPtr.Zero);
+            IntPtr pHandle = KernelBase.CreateFile(fullpath, System.IO.FileAccess.Read, System.IO.FileShare.ReadWrite, IntPtr.Zero, System.IO.FileMode.Open, System.IO.FileAttributes.Normal, IntPtr.Zero);
             if(pHandle == IntPtr.Zero)
             {
+                Console.WriteLine("Failed to get handle to {0}", fullpath);
                 return false;
             }
-            // Wrap the raw ptr into self-disposing handle
-            SafeFileHandle hFlashFile = new SafeFileHandle(pHandle, true);
 
-            using (FileStream fsFlashFile = new FileStream(hFlashFile, FileAccess.Read))
+            uint numBytesRead = 0;
+            ulong bytesReadTotal = 0;
+            byte[] buf = new byte[1024*1024]; // 1kb
+
             using (FileStream fsOutputFile = new FileStream(name, FileMode.Create, FileAccess.Write))
             {
-                int count = 0;
-                byte[] buf = new byte[1024]; // 1KB
                 do
                 {
-                    count = fsFlashFile.Read(buf, 0, 1024);
-                    fsOutputFile.Write(buf, 0, count);
-                } while (fsFlashFile.CanRead && count > 0);
+                    if (!KernelBase.ReadFile(pHandle, buf, (uint)buf.Length, out numBytesRead, IntPtr.Zero))
+                    {
+                        Console.WriteLine("Failed to ReadFile {0}, error: 0x{1:X}", fullpath, KernelBase.GetLastError());
+                        KernelBase.CloseHandle(pHandle);
+                        return false;
+                    }
+                    fsOutputFile.Write(buf, 0, (int)numBytesRead);
+                    bytesReadTotal += numBytesRead;
+                }
+                while(numBytesRead > 0);
             }
+            Console.WriteLine("Read {0} bytes", bytesReadTotal);
+            KernelBase.CloseHandle(pHandle);
             return true;
         }
     }
