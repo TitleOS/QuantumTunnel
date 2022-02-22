@@ -2,89 +2,50 @@
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
+using CommandLine;
 
 namespace QuantumTunnel
 {
-    class QuantumTunnel
-    {
-        static void Main(string[] args)
-        {
-            Console.WriteLine("QuantumTunnel - C# FlashFS Reader");
-            if(args.Length == 0)
-            {
-                Console.WriteLine("Provide name of file on flash. Example: certkeys.bin OR -rawdump to obtain a raw image of the flash, named flash.bin.");
-                Environment.Exit(1);
-            }
-            if(args[0].ToLower() == "-rawdump")
-            {
-                Console.WriteLine("Dumping raw flash image, this will take a while...");
-                if (Flash.DumpFlashImage("flash.bin"))
-                {
-                    Console.WriteLine("Dumped flash to flash.bin");
-                    Environment.Exit(0);
-                }
-                else
-                {
-                    Console.WriteLine($"An error occured, do you have privileges? Error: {new Win32Exception(Marshal.GetLastWin32Error()).Message}");
-                    Environment.Exit(1);
-                }
-            }
-            string filename = args[0];
-            FlashFS.ReadFile(filename);
-            Console.WriteLine($"File read to {Environment.CurrentDirectory}\\{filename}");
-        }
-    }
-
-    internal static class FlashFS
-    {
-        private static readonly string FlashDeviceName = "\\\\.\\Xvuc\\FlashFs";
-
-        public static bool ReadFile(string name)
-        {
-            string fullpath = FlashDeviceName + "\\" + name;
-            IntPtr pHandle = KernelBase.CreateFile(fullpath, System.IO.FileAccess.Read, System.IO.FileShare.ReadWrite, IntPtr.Zero, System.IO.FileMode.Open, System.IO.FileAttributes.Normal, IntPtr.Zero);
-            if (pHandle == IntPtr.Zero)
-            {
-                Console.WriteLine("Failed to get handle to {0}", fullpath);
-                return false;
-            }
-
-            uint numBytesRead = 0;
-            ulong bytesReadTotal = 0;
-            byte[] buf = new byte[1024 * 1024]; // 1kb
-
-            using (FileStream fsOutputFile = new FileStream(name, FileMode.Create, FileAccess.Write))
-            {
-                do
-                {
-                    if (!KernelBase.ReadFile(pHandle, buf, (uint)buf.Length, out numBytesRead, IntPtr.Zero))
-                    {
-                        Console.WriteLine("Failed to ReadFile {0}, error: 0x{1:X}", fullpath, KernelBase.GetLastError());
-                        KernelBase.CloseHandle(pHandle);
-                        return false;
-                    }
-                    fsOutputFile.Write(buf, 0, (int)numBytesRead);
-                    bytesReadTotal += numBytesRead;
-                }
-                while (numBytesRead > 0);
-            }
-            Console.WriteLine("Read {0} bytes", bytesReadTotal);
-            KernelBase.CloseHandle(pHandle);
-            return true;
-        }
-    }
-
     internal static class Flash
     {
         private static readonly string RawFlashDeviceName = "\\\\.\\Xvuc\\Flash";
+        private static readonly string FlashDeviceName = "\\\\.\\Xvuc\\FlashFs";
 
-        public static bool DumpFlashImage(string DumpToPath)
+        /// <summary>
+        /// Read raw flash image.
+        /// </summary>
+        /// <param name="outputFile">Filepath to save the flashdump.</param>
+        /// <returns>Zero on success, Non-Zero on failure</returns>
+        public static int ReadFlashImage(string outputFile)
         {
-            IntPtr pHandle = KernelBase.CreateFile(RawFlashDeviceName, System.IO.FileAccess.Read, System.IO.FileShare.ReadWrite, IntPtr.Zero, System.IO.FileMode.Open, System.IO.FileAttributes.Normal, IntPtr.Zero);
+            return ReadInternal(RawFlashDeviceName, outputFile);
+        }
+
+        /// <summary>
+        /// Read single file from flash filesystem.
+        /// </summary>
+        /// <param name="targetFile">Filename of file to read.</param>
+        /// <param name="outputFile">Filepath to save the file.</param>
+        /// <returns>Zero on success, Non-Zero on failure</returns>
+        public static int ReadFlashFsFile(string targetFile, string outputFile)
+        {
+            string fullpath = FlashDeviceName + "\\" + targetFile;
+            return ReadInternal(fullpath, outputFile);
+        }
+
+        /// <summary>
+        /// Reads from opened DeviceHandle until EOF is signalled.
+        /// </summary>
+        /// <param name="devicePath">Full device path (e.g. \\.\Xvuc\FlashFs\filename.bin)</param>
+        /// <param name="outputFile">Filepath to save the file.</param>
+        /// <returns>Zero on success, Non-Zero on failure</returns>
+        public static int ReadInternal(string devicePath, string outputFile)
+        {
+            IntPtr pHandle = KernelBase.CreateFile(devicePath, System.IO.FileAccess.Read, System.IO.FileShare.ReadWrite, IntPtr.Zero, System.IO.FileMode.Open, System.IO.FileAttributes.Normal, IntPtr.Zero);
             if (pHandle == IntPtr.Zero)
             {
-                Console.WriteLine("Failed to get handle to {0}", RawFlashDeviceName);
-                return false;
+                Console.WriteLine("Failed to get handle to {0}", devicePath);
+                return -3;
             }
 
             bool success = false;
@@ -92,19 +53,17 @@ namespace QuantumTunnel
             ulong bytesReadTotal = 0;
             byte[] buf = new byte[1024 * 1024]; // 1kb
 
-            using (FileStream fsOutputFile = new FileStream(DumpToPath, FileMode.Create, FileAccess.Write))
+            using (FileStream fsOutputFile = new FileStream(outputFile, FileMode.Create, FileAccess.Write))
             {
                 do
                 {
                     success = KernelBase.ReadFile(pHandle, buf, (uint)buf.Length, out numBytesRead, IntPtr.Zero);
-                    if (!success && bytesReadTotal == 0) // Only fail if nothing was read yet
+                    if (!success && bytesReadTotal == 0 && numBytesRead == 0)
                     {
-                        Console.WriteLine("Failed to ReadFile {0}, error: 0x{1:X}", RawFlashDeviceName, KernelBase.GetLastError());
-                        Console.WriteLine(numBytesRead);
+                        Console.WriteLine("Failed to ReadFile {0}, error: 0x{1:X}", devicePath, KernelBase.GetLastError());
                         KernelBase.CloseHandle(pHandle);
-                        return false;
+                        return -4;
                     }
-
                     fsOutputFile.Write(buf, 0, (int)numBytesRead);
                     bytesReadTotal += numBytesRead;
                 }
@@ -112,7 +71,7 @@ namespace QuantumTunnel
             }
             Console.WriteLine("Read {0} bytes", bytesReadTotal);
             KernelBase.CloseHandle(pHandle);
-            return true;
+            return 0;
         }
     }
 
@@ -138,6 +97,53 @@ namespace QuantumTunnel
 
         [DllImport("kernelbase.dll")]
         public static extern uint GetLastError();
+    }
+
+    class CommandLineOptions
+    {
+        [Value(index: 0, Required = false, HelpText = "File to dump from FlashFs.")]
+        public string TargetFile { get; set; }
+
+        [Option(shortName: 'o', longName: "output", Required = false, HelpText = "Output filepath.")]
+        public string OutputFile { get; set; }
+
+        [Option(shortName: 'r', longName: "rawdump", Required = false, HelpText = "Toggle raw flashimage dumping.")]
+        public bool DoRawdump { get; set; }
+    }
+
+    class QuantumTunnel
+    {
+        /// <param name="rawdump">Dump full raw flash</param>
+        /// <param name="filename">Filename of file to dump from FlashFs</param>
+        /// <param name="output">Output filepath</param>
+        static int Main(string[] args)
+        {
+            Console.WriteLine("QuantumTunnel - C# FlashFS Reader");
+
+            var exitCode = Parser.Default.ParseArguments<CommandLineOptions>(args)
+                .MapResult(
+                    (CommandLineOptions opts) => {
+                        if (!String.IsNullOrEmpty(opts.TargetFile))
+                        {
+                            return Flash.ReadFlashFsFile(opts.TargetFile, opts.OutputFile ?? opts.TargetFile);
+                        }
+                        else if (opts.DoRawdump)
+                        {
+                            return Flash.ReadFlashImage(opts.OutputFile ?? "flash.bin");
+                        }
+                        else
+                        {
+                            Console.WriteLine("Error: Neither filename or rawdump flag provided!");
+                            return -2;
+                        }
+                    },
+                    _ => {
+                        Console.WriteLine("Error parsing arguments! Use --help!");
+                        return -1;
+                    });
+
+            return exitCode;
+        }
     }
 
 }
