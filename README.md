@@ -14,8 +14,8 @@ If dotnet isn't in your PATH:
 If dotnet is in your PATH:
 `QuantumTunnel.exe FileToDump`
 
-To obtain a raw flash image, usable in XBFS tools, use -rawdump (1GBish on Series S/X):
-`dotnet QuantumTunnel.dll -rawdump`
+To obtain a raw flash image, usable in XBFS tools, use --rawdump (1GBish on Series S/X):
+`dotnet QuantumTunnel.dll --rawdump`
 
 ### FAQ
 Q: Why can't I dump X file? (host.xvd, system.xvd, etc)

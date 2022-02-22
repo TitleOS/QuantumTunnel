@@ -1,0 +1,27 @@
+name: .NET
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 6.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: dotnet build -c Release --no-restore
+    - name: Upload artifacts (dotnet)
+      uses: actions/upload-artifact@v2
+      with:
+        name: QuantumTunnel-dotnet
+        path: 'bin/Release/net6.0/*'
