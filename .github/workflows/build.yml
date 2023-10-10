@@ -27,7 +27,7 @@ jobs:
         path: bin/Release/net7.0/*
 
     - name: Build (standalone)
-      run: dotnet publish -c Release --self-contained -r win-x64 -p:PublishTrimmed=true -p:PublishSingleFile=true
+      run: dotnet publish -c Release --self-contained -r win-x64 -p:PublishSingleFile=true
     - name: Prepare standalone release
       run: |
         mkdir release
