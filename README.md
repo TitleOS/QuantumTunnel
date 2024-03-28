@@ -2,7 +2,7 @@
 A Xbox One/Series Flash Dumper for SystemOS created in C#.
 
 ### Prerequisites
-.NET 7 is required, for instructions on installing .NET to your console over SSH follow https://xosft.dev/wiki/installing-compatible-software/.
+.NET 7 is required, for instructions on installing .NET to your console over SSH follow https://xboxoneresearch.github.io/wiki/development/installing-compatible-software/.
 
 You must also have an administrator account, with a shell **elevated to SYSTEM** on your console in either Retail or Dev Mode to access the flash driver. 
 
